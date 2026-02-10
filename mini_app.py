@@ -123,7 +123,8 @@ def get_or_create_user(telegram_id, username=None, first_name=None):
                 [
                     {
                         "text": "🔍 Посмотреть сделку",
-                        "url": f"https://nft-gifts-market-uid.onrender.com/deal/{deal_id}"
+                        ""url": f"https://nft-gifts-market-bot.onrender.com/deal/{deal_id}"
+{deal_id}"
                     }
                 ]
             ]
@@ -393,7 +394,7 @@ def api_create_deal():
         
         # Если мы на Render, используем правильный домен
         if 'onrender.com' in request.host or 'render.com' in request.host:
-            base_url = 'https://nft-gifts-market-uid.onrender.com'
+            base_url = 'https://nft-gifts-market-bot.onrender.com'
         
         # Создаем ссылку для бота в Telegram (обычная ссылка, не мини приложение)
         deal_url = f"https://t.me/noscamnftrbot?start=deal_{deal_id}"
@@ -763,4 +764,5 @@ if __name__ == '__main__':
     print("📱 Mini App будет доступен по адресу: http://localhost:3000")
     print("🔧 Для остановки нажмите Ctrl+C")
     print("-" * 50)
+
     app.run(debug=True, host='0.0.0.0', port=3000)
