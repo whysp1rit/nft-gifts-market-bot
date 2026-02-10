@@ -225,17 +225,23 @@ async def confirm_deal_callback(call: types.CallbackQuery):
     deal_id = call.data.replace('confirm_deal_', '')
     
     try:
-        response = requests.get(f"https://nft-gifts-market-bot.onrender.com/api/deal/{deal_id}")
+        # Подтверждаем сделку через API
+        response = requests.post(
+            f"https://nft-gifts-market-bot.onrender.com/api/admin/confirm_deal",
+            json={'deal_id': deal_id, 'admin_id': ADMIN_ID},
+            timeout=10
+        )
         
         if response.status_code == 200:
-            deal_data = response.json()
-            if deal_data.get('success'):
-                deal = deal_data.get('deal')
-                
+            result = response.json()
+            if result.get('success'):
                 await call.message.edit_text(
                     text=f"<b>✅ Сделка #{deal_id} подтверждена!</b>\n\n"
+                         f"💰 {result.get('message')}\n"
                          f"📅 Время подтверждения: сейчас\n\n"
-                         f"<i>Сделка успешно завершена администратором.</i>",
+                         f"<i>Баланс продавца обновлён. Для вывода средств продавцу нужно:</i>\n"
+                         f"1. Пройти авторизацию в боте\n"
+                         f"2. Написать в поддержку @noscamnftsup",
                     reply_markup=types.InlineKeyboardMarkup(
                         inline_keyboard=[
                             [
@@ -247,12 +253,11 @@ async def confirm_deal_callback(call: types.CallbackQuery):
                         ]
                     )
                 )
-                
                 print(f"✅ Сделка {deal_id} подтверждена администратором")
             else:
-                await call.answer("❌ Ошибка получения данных сделки", show_alert=True)
+                await call.answer(f"❌ {result.get('message')}", show_alert=True)
         else:
-            await call.answer("❌ Сделка не найдена", show_alert=True)
+            await call.answer("❌ Ошибка подтверждения сделки", show_alert=True)
             
     except Exception as e:
         await call.answer("❌ Ошибка подтверждения сделки", show_alert=True)
@@ -269,24 +274,42 @@ async def reject_deal_callback(call: types.CallbackQuery):
     
     deal_id = call.data.replace('reject_deal_', '')
     
-    await call.message.edit_text(
-        text=f"<b>❌ Сделка #{deal_id} отклонена</b>\n\n"
-             f"📅 Время отклонения: сейчас\n"
-             f"👤 Отклонено администратором\n\n"
-             f"<i>Сделка была отклонена и не будет выполнена.</i>",
-        reply_markup=types.InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    types.InlineKeyboardButton(
-                        text="🔍 Посмотреть сделку",
-                        url=f"https://nft-gifts-market-bot.onrender.com/deal/{deal_id}"
-                    )
-                ]
-            ]
+    try:
+        # Отклоняем сделку через API
+        response = requests.post(
+            f"https://nft-gifts-market-bot.onrender.com/api/admin/reject_deal",
+            json={'deal_id': deal_id, 'admin_id': ADMIN_ID},
+            timeout=10
         )
-    )
-    
-    print(f"❌ Сделка {deal_id} отклонена администратором")
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('success'):
+                await call.message.edit_text(
+                    text=f"<b>❌ Сделка #{deal_id} отклонена</b>\n\n"
+                         f"📅 Время отклонения: сейчас\n"
+                         f"👤 Отклонено администратором\n\n"
+                         f"<i>Сделка была отклонена и не будет выполнена.</i>",
+                    reply_markup=types.InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [
+                                types.InlineKeyboardButton(
+                                    text="🔍 Посмотреть сделку",
+                                    url=f"https://nft-gifts-market-bot.onrender.com/deal/{deal_id}"
+                                )
+                            ]
+                        ]
+                    )
+                )
+                print(f"❌ Сделка {deal_id} отклонена администратором")
+            else:
+                await call.answer(f"❌ {result.get('message')}", show_alert=True)
+        else:
+            await call.answer("❌ Ошибка отклонения сделки", show_alert=True)
+            
+    except Exception as e:
+        await call.answer("❌ Ошибка отклонения сделки", show_alert=True)
+        print(f"❌ Ошибка отклонения сделки {deal_id}: {e}")
 
 @dp.message_handler(commands=['start'])
 async def start_handler(message: types.Message):

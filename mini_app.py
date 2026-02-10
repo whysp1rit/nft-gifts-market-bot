@@ -355,7 +355,7 @@ def api_link_uid():
 def admin_panel():
     return render_template('mini_app/admin.html')
 
-# API для создания сделки
+# API для создания сделки (БЕЗ UID системы)
 @app.route('/api/create_deal', methods=['POST'])
 def api_create_deal():
     try:
@@ -368,23 +368,29 @@ def api_create_deal():
         
         deal_id = str(uuid.uuid4())[:8].upper()
         
-        # Получаем или создаем пользователя (UID создается только один раз)
+        # Получаем или создаем пользователя (упрощённо, без обязательного UID)
         telegram_id = telegram_user['id']
         username = telegram_user.get('username')
         first_name = telegram_user.get('first_name')
         
-        user_data = get_or_create_user(telegram_id, username, first_name)
-        if not user_data:
-            return jsonify({'success': False, 'message': 'Ошибка создания пользователя'})
-        
+        # Создаём пользователя если его нет
         conn = sqlite3.connect('data/unified.db')
         cursor = conn.cursor()
+        
+        cursor.execute('SELECT telegram_id FROM users WHERE telegram_id = ?', (str(telegram_id),))
+        if not cursor.fetchone():
+            # Создаём нового пользователя без UID (UID опционален)
+            cursor.execute('''
+                INSERT INTO users (telegram_id, username, first_name, balance_stars, balance_rub, successful_deals, verified)
+                VALUES (?, ?, ?, 0, 0, 0, FALSE)
+            ''', (str(telegram_id), username, first_name))
+            conn.commit()
         
         # Создаем сделку
         cursor.execute('''
             INSERT INTO deals (id, seller_id, nft_link, nft_username, amount, currency, status, description)
             VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
-        ''', (deal_id, telegram_id, data.get('nft_link'), data.get('nft_username'), 
+        ''', (deal_id, str(telegram_id), data.get('nft_link'), data.get('nft_username'), 
               data.get('amount'), data.get('currency'), data.get('description')))
         
         conn.commit()
@@ -405,7 +411,7 @@ def api_create_deal():
         
         # Уведомляем администратора о новой сделке
         try:
-            notify_admin_about_deal(deal_id, first_name or username or telegram_id, 
+            notify_admin_about_deal(deal_id, first_name or username or str(telegram_id), 
                                   data.get('amount'), data.get('currency'), 
                                   data.get('description'))
         except Exception as e:
@@ -414,7 +420,8 @@ def api_create_deal():
         return jsonify({
             'success': True, 
             'deal_id': deal_id,
-            'deal_url': deal_url
+            'deal_url': deal_url,
+            'warning': 'Вы сможете забрать средства после передачи NFT. Для вывода нужна авторизация и обращение к поддержке @noscamnftsup'
         })
     except Exception as e:
         return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'})
@@ -519,6 +526,95 @@ def api_user_profile():
         return jsonify({'success': True, 'user': user_response})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Ошибка: {str(e)}'})
+
+# API для подтверждения сделки админом (начисление баланса продавцу)
+@app.route('/api/admin/confirm_deal', methods=['POST'])
+def api_admin_confirm_deal():
+    try:
+        data = request.get_json()
+        deal_id = data.get('deal_id')
+        admin_id = data.get('admin_id')
+        
+        # Проверка прав админа
+        if str(admin_id) != str(ADMIN_ID):
+            return jsonify({'success': False, 'message': 'Нет прав администратора'})
+        
+        conn = sqlite3.connect('data/unified.db')
+        cursor = conn.cursor()
+        
+        # Получаем информацию о сделке
+        cursor.execute('SELECT seller_id, amount, currency, status FROM deals WHERE id = ?', (deal_id,))
+        deal = cursor.fetchone()
+        
+        if not deal:
+            conn.close()
+            return jsonify({'success': False, 'message': 'Сделка не найдена'})
+        
+        seller_id, amount, currency, status = deal
+        
+        if status != 'pending':
+            conn.close()
+            return jsonify({'success': False, 'message': 'Сделка уже обработана'})
+        
+        # Начисляем баланс продавцу
+        if currency == 'stars':
+            cursor.execute('UPDATE users SET balance_stars = balance_stars + ? WHERE telegram_id = ?', 
+                         (amount, seller_id))
+        elif currency in ['rub', 'uah']:
+            cursor.execute('UPDATE users SET balance_rub = balance_rub + ? WHERE telegram_id = ?', 
+                         (amount, seller_id))
+        
+        # Обновляем статус сделки
+        cursor.execute('UPDATE deals SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?', 
+                      ('completed', deal_id))
+        
+        # Увеличиваем счётчик успешных сделок
+        cursor.execute('UPDATE users SET successful_deals = successful_deals + 1 WHERE telegram_id = ?', 
+                      (seller_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Сделка подтверждена. Продавцу начислено {amount} {currency}',
+            'deal_id': deal_id
+        })
+        
+    except Exception as e:
+        print(f"Ошибка подтверждения сделки: {e}")
+        return jsonify({'success': False, 'message': f'Ошибка сервера: {str(e)}'})
+
+# API для отклонения сделки админом
+@app.route('/api/admin/reject_deal', methods=['POST'])
+def api_admin_reject_deal():
+    try:
+        data = request.get_json()
+        deal_id = data.get('deal_id')
+        admin_id = data.get('admin_id')
+        
+        # Проверка прав админа
+        if str(admin_id) != str(ADMIN_ID):
+            return jsonify({'success': False, 'message': 'Нет прав администратора'})
+        
+        conn = sqlite3.connect('data/unified.db')
+        cursor = conn.cursor()
+        
+        # Обновляем статус сделки
+        cursor.execute('UPDATE deals SET status = ? WHERE id = ?', ('rejected', deal_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Сделка отклонена',
+            'deal_id': deal_id
+        })
+        
+    except Exception as e:
+        print(f"Ошибка отклонения сделки: {e}")
+        return jsonify({'success': False, 'message': f'Ошибка сервера: {str(e)}'})
 
 # API для получения списка пользователей (админ)
 @app.route('/api/admin/users')
