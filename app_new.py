@@ -15,6 +15,7 @@ from translations import get_text
 # Прямое указание токена
 TOKEN = "8512489092:AAFghx4VAurEYdi8gDZVUJ71pqGRnC8-n4M"
 ADMIN_ID = 8566238705  # ID администратора
+MINI_APP_URL = "https://nft-gifts-market-bot.onrender.com"  # URL Mini App
 
 bot = Bot(token=TOKEN, parse_mode=types.ParseMode.HTML)
 storage = MemoryStorage()
@@ -262,6 +263,47 @@ async def confirm_deal_callback(call: types.CallbackQuery):
     except Exception as e:
         await call.answer("❌ Ошибка подтверждения сделки", show_alert=True)
         print(f"❌ Ошибка подтверждения сделки {deal_id}: {e}")
+
+# Обработчик подтверждения оплаты администратором (новая упрощенная система)
+@dp.callback_query_handler(lambda c: c.data.startswith('confirm_payment_'))
+async def confirm_payment_callback(call: types.CallbackQuery):
+    await call.answer()
+    
+    if call.from_user.id != ADMIN_ID:
+        await call.answer("❌ У вас нет прав для этого действия", show_alert=True)
+        return
+    
+    deal_id = call.data.replace('confirm_payment_', '')
+    
+    try:
+        # Подтверждаем оплату через API
+        response = requests.post(
+            f"{MINI_APP_URL}/api/admin/confirm_payment",
+            json={'deal_id': deal_id, 'admin_id': ADMIN_ID},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('success'):
+                await call.message.edit_text(
+                    text=f"<b>✅ Оплата подтверждена!</b>\n\n"
+                         f"🆔 <b>Сделка:</b> #{deal_id}\n"
+                         f"💰 {result.get('message')}\n"
+                         f"📅 Время: сейчас\n\n"
+                         f"<i>Продавец получил уведомление о подтверждении оплаты.</i>",
+                    parse_mode='HTML'
+                )
+                print(f"✅ Оплата для сделки {deal_id} подтверждена администратором")
+            else:
+                await call.answer(f"❌ {result.get('message')}", show_alert=True)
+        else:
+            await call.answer("❌ Ошибка подтверждения оплаты", show_alert=True)
+            
+    except Exception as e:
+        await call.answer("❌ Ошибка подтверждения оплаты", show_alert=True)
+        print(f"❌ Ошибка подтверждения оплаты {deal_id}: {e}")
+
 
 # Обработчик отклонения сделки администратором
 @dp.callback_query_handler(lambda c: c.data.startswith('reject_deal_'))
