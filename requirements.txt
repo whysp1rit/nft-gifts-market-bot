@@ -1,0 +1,4 @@
+aiogram==2.25.1
+telethon==1.28.5
+flask==2.3.0
+requests==2.31.0
