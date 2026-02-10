@@ -86,6 +86,8 @@ def get_or_create_user(telegram_id, username=None, first_name=None):
         conn.close()
         print(f"❌ Ошибка работы с пользователем {telegram_id}: {e}")
         return None
+
+def notify_admin_about_deal(deal_id, seller_name, amount, currency, description):
     """Отправляет уведомление администратору о новой сделке через Telegram Bot API"""
     try:
         currency_symbols = {
@@ -488,12 +490,14 @@ def api_my_deals():
 def api_user_profile():
     try:
         telegram_user_id = request.args.get('user_id')
+        username = request.args.get('username')
+        first_name = request.args.get('first_name')
         
         if not telegram_user_id:
             return jsonify({'success': False, 'message': 'Не указан ID пользователя'})
         
         # Получаем или создаем пользователя (UID создается только один раз)
-        user_data = get_or_create_user(telegram_user_id)
+        user_data = get_or_create_user(telegram_user_id, username, first_name)
         if not user_data:
             return jsonify({'success': False, 'message': 'Ошибка получения данных пользователя'})
         
