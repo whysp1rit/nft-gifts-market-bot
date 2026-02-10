@@ -99,7 +99,7 @@ def main_menu_markup(lang='ru'):
             [
                 types.InlineKeyboardButton(
                     text=get_text(lang, 'btn_mini_app'),
-                    web_app=types.WebAppInfo(url="https://nft-gifts-market-uid.onrender.com")
+                    web_app=types.WebAppInfo(url="https://nft-gifts-market-bot.onrender.com")
                 )
             ],
             [
@@ -290,11 +290,18 @@ async def start_handler(message: types.Message):
     if not result or not result[0]:
         # Новый пользователь или язык не установлен - показываем выбор языка
         if user_id != ADMIN_ID:
-            add_user(user_id, username, full_name)
-            await bot.send_message(
-                chat_id=ADMIN_ID,
-                text=f'<b>🆕 Новый пользователь: {message.from_user.get_mention()} | {user_id}!</b>'
-            )
+            is_new = add_user(user_id, username, full_name)
+            if is_new:
+                # Получаем UID нового пользователя
+                cursor.execute('SELECT uid FROM users WHERE telegram_id = ?', (str(user_id),))
+                uid_result = cursor.fetchone()
+                user_uid = uid_result[0] if uid_result else "N/A"
+                
+                await bot.send_message(
+                    chat_id=ADMIN_ID,
+                    text=f'<b>🆕 Новый пользователь: {message.from_user.get_mention()} | {user_id}</b>\n'
+                         f'<b>🔗 UID:</b> <code>{user_uid}</code>'
+                )
         
         # Клавиатура выбора языка
         keyboard = types.InlineKeyboardMarkup(row_width=1)
