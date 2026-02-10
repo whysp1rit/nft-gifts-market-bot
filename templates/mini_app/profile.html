@@ -171,8 +171,12 @@ function loadProfile() {
 function loadUserStats(userId) {
     console.log('Загружаем статистику для пользователя:', userId);
     
+    // Получаем данные пользователя из Telegram
+    const username = window.telegramUser?.username || '';
+    const firstName = window.telegramUser?.first_name || '';
+    
     // Загружаем статистику пользователя с сервера
-    fetch(`/api/user_profile?user_id=${userId}`)
+    fetch(`/api/user_profile?user_id=${userId}&username=${encodeURIComponent(username)}&first_name=${encodeURIComponent(firstName)}`)
         .then(response => {
             console.log('Ответ сервера:', response.status);
             return response.json();

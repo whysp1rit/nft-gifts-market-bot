@@ -326,7 +326,9 @@
         // Загрузка данных пользователя для проверки админ доступа
         function loadUserDataForAdminCheck() {
             if (window.telegramUser) {
-                fetch(`/api/user_profile?user_id=${window.telegramUser.id}`)
+                const username = window.telegramUser.username || '';
+                const firstName = window.telegramUser.first_name || '';
+                fetch(`/api/user_profile?user_id=${window.telegramUser.id}&username=${encodeURIComponent(username)}&first_name=${encodeURIComponent(firstName)}`)
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
@@ -334,7 +336,7 @@
                             console.log('Данные пользователя загружены:', data.user);
                             checkAdminAccess();
                         } else {
-                            console.log('Не удалось загрузить данные пользователя');
+                            console.log('Не удалось загрузить данные пользователя:', data.message);
                             checkAdminAccess();
                         }
                     })
