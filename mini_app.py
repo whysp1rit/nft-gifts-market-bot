@@ -125,7 +125,7 @@ def notify_admin_about_deal(deal_id, seller_name, amount, currency, description)
                 [
                     {
                         "text": "🔍 Посмотреть сделку",
-                        "url": f"http://localhost:3000/deal/{deal_id}"
+                        "url": f"https://nft-gifts-market-bot.onrender.com/deal/{deal_id}"
                     }
                 ]
             ]
@@ -398,7 +398,7 @@ def api_create_deal():
             base_url = 'http://localhost:3000'
         # Если мы на Render, используем правильный домен
         elif 'onrender.com' in request.host or 'render.com' in request.host:
-            base_url = 'https://nft-gifts-market-uid.onrender.com'
+            base_url = 'https://nft-gifts-market-bot.onrender.com'
         
         # Создаем ссылку для бота в Telegram (обычная ссылка, не мини приложение)
         deal_url = f"https://t.me/noscamnftrbot?start=deal_{deal_id}"
